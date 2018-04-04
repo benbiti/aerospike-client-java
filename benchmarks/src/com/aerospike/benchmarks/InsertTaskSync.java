@@ -22,6 +22,7 @@ import com.aerospike.client.Bin;
 import com.aerospike.client.Key;
 import com.aerospike.client.util.RandomShift;
 import com.aerospike.client.util.Util;
+import javafx.scene.control.RadioMenuItem;
 
 public final class InsertTaskSync extends InsertTask implements Runnable {
 
@@ -74,9 +75,12 @@ public final class InsertTaskSync extends InsertTask implements Runnable {
 	}
 	
 	private void runCommand(long keyCurrent, RandomShift random) {
-		Key key = new Key(args.namespace, args.setName, keyCurrent);
+		String userKey = String.valueOf(random.nextInt(255)) +
+				  String.valueOf(random.nextInt(255)) +
+				"." + String.valueOf(random.nextInt(255));
+		Key key = new Key(args.namespace, args.setName, userKey);
 		// Use predictable value for 0th bin same as key value
-		Bin[] bins = args.getBins(random, true, keyCurrent);
+		Bin[] bins = args.getBins(random, true, keyCurrent, userKey);
 		put(key, bins);		
 	}
 	

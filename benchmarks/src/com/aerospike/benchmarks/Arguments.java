@@ -23,6 +23,9 @@ import com.aerospike.client.policy.Policy;
 import com.aerospike.client.policy.WritePolicy;
 import com.aerospike.client.util.RandomShift;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Arguments {
 	public String namespace;
 	public String setName;
@@ -46,16 +49,20 @@ public class Arguments {
 	public KeyType keyType;
 	public Bin[] fixedBins;
 	public Bin[] fixedBin;
+	//Ai or appId
+	//TODO: Use Random ai or appid pool?
+	public static char[] aiChars =
+			new String("0123456789abcdefghijklmnopqrstuvwzxy").toCharArray();
 
 	public void setFixedBins() {
 		// Fixed values are used when the extra random call overhead is not wanted
 		// in the benchmark measurement.
 		RandomShift random = new RandomShift();
-		fixedBins = getBins(random, true, -1);
+		fixedBins = getBins(random, true, -1, "Test");
 		fixedBin = new Bin[] {fixedBins[0]};
 	}
 
-	public Bin[] getBins(RandomShift random, boolean multiBin, long keySeed) {
+	public Bin[] getBins(RandomShift random, boolean multiBin, long keySeed, String UserKey) {
 		if (fixedBins != null) {
 		    return (multiBin)? fixedBins : fixedBin;
 		}
@@ -68,13 +75,30 @@ public class Arguments {
 			String name = Integer.toString(i);
 			// Use passed in value for 0th bin. Random for others.
 			Value value = genValue(random, objectSpec[i % specLength],
-							i == 0 ? keySeed : -1);
+							keySeed, UserKey);
 			bins[i] = new Bin(name, value);
 		}
 		return bins;
 	}
-    
-	private static Value genValue(RandomShift random, DBObjectSpec spec, long keySeed) {
+
+	public Map getBinMapItems(RandomShift random, boolean multiBin, long keySeed, String UserKey) {
+
+		HashMap<Value, Value> map = new HashMap<>();
+		StringBuilder sb = new StringBuilder( objectSpec[0 % objectSpec.length].size * 2 );
+		sb.append(String.valueOf(random.nextInt(255)));
+		sb.append(":abcdedfghijklmnop");
+		//random 3 up to 35*35*35 = 42875 for mock ai and app id
+		for (int j = 0; j < 3; j++) {
+			sb.append(aiChars[random.nextInt(35)]);
+		}
+		String key_value = sb.toString();
+		map.put(Value.get(key_value), Value.get("1"));
+		map.put(Value.get("PK"), Value.get(UserKey));
+
+		return map;
+	}
+
+	private static Value genValue(RandomShift random, DBObjectSpec spec, long keySeed, String UserKey) {
 		switch (spec.type) {
 		case 'I':
 			if (keySeed == -1) {
@@ -98,7 +122,35 @@ public class Arguments {
 			
 		case 'D':
 			return Value.get(System.currentTimeMillis());
-			
+
+		case 'M':
+			HashMap<String, String> map = new HashMap<>();
+			StringBuilder sb2 = new StringBuilder(spec.size);
+			for (int i = 0; i < 1024; i++) {
+				sb2.setLength(0);
+				for (int j = 0; j < spec.size; j++) {
+					// Append ascii value in aiChars
+					sb2.append((char)(random.nextInt(94) + 33));
+				}
+				String key_value = sb2.toString();
+				map.put(key_value, "0");
+			}
+			return Value.get(map);
+
+		case 'A':
+			HashMap<String, String> mapA = new HashMap<>();
+			StringBuilder sb3 = new StringBuilder(spec.size * 2);
+			sb3.append(String.valueOf(random.nextInt(255)));
+			sb3.append(":abcdedfghijklmnop");
+			//random 3 up to 35*35*35 = 42875 for mock ai and app id
+			for (int j = 0; j < 3; j++) {
+				sb3.append(aiChars[random.nextInt(35)]);
+			}
+			String key_value = sb3.toString();
+			mapA.put(key_value, "1");
+			mapA.put("PK", UserKey);
+
+			return Value.get(mapA);
 		default:
 			return Value.getAsNull();
 		}

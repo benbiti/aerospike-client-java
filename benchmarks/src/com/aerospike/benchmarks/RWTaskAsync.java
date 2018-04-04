@@ -28,6 +28,8 @@ import com.aerospike.client.listener.WriteListener;
 import com.aerospike.client.policy.WritePolicy;
 import com.aerospike.client.util.RandomShift;
 
+import java.util.Map;
+
 public final class RWTaskAsync extends RWTask {
 	
 	private final AerospikeClient client;
@@ -79,7 +81,11 @@ public final class RWTaskAsync extends RWTask {
 		}
 		client.put(eventLoop, writeListener, policy, key, bins);	
 	}
-	
+
+	@Override
+	protected void putItems(WritePolicy policy, Key key, Map map) {
+		System.out.println("Not Implement");
+	}
 	@Override
 	protected void add(Key key, Bin[] bins) {		
 		if (useLatency) {

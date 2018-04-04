@@ -63,7 +63,7 @@ public final class InsertTaskAsync extends InsertTask {
 	public void runCommand() {
 		long currentKey = keyStart + keyCount;
 		Key key = new Key(args.namespace, args.setName, currentKey);
-		Bin[] bins = args.getBins(random, true, currentKey);
+		Bin[] bins = args.getBins(random, true, currentKey, "");
 		
 		if (useLatency) {
 			begin = System.nanoTime();

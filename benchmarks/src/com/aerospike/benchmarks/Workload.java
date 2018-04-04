@@ -34,7 +34,6 @@ public enum Workload {
 	 * Read/Modify/Update. Perform random key, read all bins, write one bin workload.
 	 */
 	READ_MODIFY_UPDATE,
-	
 	/**
 	 * Read/Modify/Increment. Perform random key, read all bins, increment one integer bin workload.
 	 */
@@ -53,5 +52,7 @@ public enum Workload {
 	/**
 	 * Form business transactions
 	 */
-	TRANSACTION;
+	TRANSACTION,
+
+	MAP_READ_UPDATE;
 }

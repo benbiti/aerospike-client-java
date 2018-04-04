@@ -17,12 +17,15 @@
 package com.aerospike.benchmarks;
 
 import java.util.Iterator;
+import java.util.Map;
 
 import com.aerospike.client.AerospikeException;
 import com.aerospike.client.Bin;
 import com.aerospike.client.Key;
 import com.aerospike.client.Record;
 import com.aerospike.client.ResultCode;
+import com.aerospike.client.cdt.MapOperation;
+import com.aerospike.client.cdt.MapPolicy;
 import com.aerospike.client.policy.GenerationPolicy;
 import com.aerospike.client.policy.WritePolicy;
 import com.aerospike.client.util.RandomShift;
@@ -81,6 +84,8 @@ public abstract class RWTask {
 			case TRANSACTION:
 				runTransaction(random);
 				break;
+			case MAP_READ_UPDATE:
+				runMapReadUpdate(random);
 			}
 		} 
 		catch (Exception e) {
@@ -101,8 +106,7 @@ public abstract class RWTask {
 			boolean isMultiBin = random.nextInt(100) < args.readMultiBinPct;
 			
 			if (args.batchSize <= 1) {
-				long key = random.nextLong(keyCount);
-				doRead(key, isMultiBin);
+				doRead(random, isMultiBin);
 			}
 			else {
 				doReadBatch(random, isMultiBin);
@@ -128,27 +132,58 @@ public abstract class RWTask {
 
 	private void readModifyUpdate(RandomShift random) {
 		long key = random.nextLong(keyCount);
-				
 		// Read all bins.
-		doRead(key, true);
+		doRead(random, true);
 		// Write one bin.
 		doWrite(random, key, false, null);
 	}
-	
+
+	private void runMapReadUpdate(RandomShift random) {
+
+		if (random.nextInt(100) < args.readPct) {
+			boolean isMultiBin = random.nextInt(100) < args.readMultiBinPct;
+
+			if (args.batchSize <= 1) {
+				doRead(random, isMultiBin);
+			}
+			else {
+				doReadBatch(random, isMultiBin);
+			}
+		}
+		else {
+
+			if (args.batchSize <= 1) {
+				// Single record write.
+				// Write one bin.
+				doMapUpdate(random, 0, false, null);
+			}
+			else {
+				// Batch write is not supported, so write batch size one record at a time.
+				for (int i = 0; i < args.batchSize; i++) {
+					// Write one bin.
+					doMapUpdate(random, 0, false, null);
+				}
+			}
+		}
+
+		long key = random.nextLong(keyCount);
+		// Read all bins.
+		doRead(random, true);
+
+	}
+
 	private void readModifyIncrement(RandomShift random) {
 		long key = random.nextLong(keyCount);
-
 		// Read all bins.
-		doRead(key, true);
+		doRead(random, true);
 		// Increment one bin.
 		doIncrement(key, 1);
 	}
 
 	private void readModifyDecrement(RandomShift random) {
 		long key = random.nextLong(keyCount);
-
 		// Read all bins.
-		doRead(key, true);
+		doRead(random, true);
 		// Decrement one bin.
 		doIncrement(key, -1);
 	}
@@ -172,8 +207,7 @@ public abstract class RWTask {
 			TransactionalItem thisItem = iterator.next();
 			switch (thisItem.getType()) {
 				case MULTI_BIN_READ:
-					key = random.nextLong(keyCount);
-					doRead(key, true);
+					doRead(random, true);
 					break;
 				case MULTI_BIN_BATCH_READ:
 					doRead(getKeys(random, thisItem.getRepetitions()), true);
@@ -192,8 +226,7 @@ public abstract class RWTask {
 					doIncrement(key, 1);
 					break;
 				case SINGLE_BIN_READ:
-					key = random.nextLong(keyCount);
-					doRead(key, false);
+					doRead(random, false);
 					break;
 				case SINGLE_BIN_BATCH_READ:
 					doRead(getKeys(random, thisItem.getRepetitions()), false);
@@ -230,9 +263,12 @@ public abstract class RWTask {
 	 * Write the key at the given index
 	 */
 	protected void doWrite(RandomShift random, long keyIdx, boolean multiBin, WritePolicy writePolicy) {
-		Key key = new Key(args.namespace, args.setName, keyStart + keyIdx);
+		String userKey =  // String.valueOf(random.nextInt(255)) +
+				"110.110" + // String.valueOf(random.nextInt(255)) +
+				"." + String.valueOf(random.nextInt(255));
+		Key key = new Key(args.namespace, args.setName, userKey);
 		// Use predictable value for 0th bin same as key value
-		Bin[] bins = args.getBins(random, multiBin, keyStart + keyIdx);
+		Bin[] bins = args.getBins(random, multiBin, keyStart + keyIdx, userKey);
 		
 		try {
 			put(writePolicy, key, bins);
@@ -247,6 +283,26 @@ public abstract class RWTask {
 		}
 	}
 
+	protected void doMapUpdate(RandomShift random, long keyIdx, boolean multiBin, WritePolicy writePolicy) {
+		String userKey =   // String.valueOf(random.nextInt(255)) +
+				"110." +
+				 String.valueOf(random.nextInt(255)) +
+						"." + String.valueOf(random.nextInt(255));
+		Key key = new Key(args.namespace, args.setName, userKey);
+		// Use predictable value for 0th bin same as key value
+		Map map = args.getBinMapItems(random, multiBin, keyStart + keyIdx, userKey);
+		try {
+			putItems(writePolicy, key, map);
+		}
+		catch (AerospikeException ae) {
+			writeFailure(ae);
+			runNextCommand();
+		}
+		catch (Exception e) {
+			writeFailure(e);
+			runNextCommand();
+		}
+	}
 	/**
 	 * Increment (or decrement, if incrValue is negative) the key at the given index.
 	 */
@@ -270,10 +326,13 @@ public abstract class RWTask {
 	/**
 	 * Read the key at the given index.
 	 */
-	protected void doRead(long keyIdx, boolean multiBin) {
+	protected void doRead(RandomShift random, boolean multiBin) {
 		try {
-			Key key = new Key(args.namespace, args.setName, keyStart + keyIdx);
-			
+			String userKey = String.valueOf(random.nextInt(255)) +
+					// "110." +
+					String.valueOf(random.nextInt(255)) +
+					"." + String.valueOf(random.nextInt(255));
+			Key key = new Key(args.namespace, args.setName, userKey);
 			if (multiBin) {
 				// Read all bins, maybe validate
 				get(key);			
@@ -464,4 +523,6 @@ public abstract class RWTask {
 	protected abstract void get(Key key);
 	protected abstract void get(Key[] keys);
 	protected abstract void get(Key[] keys, String binName);
+	protected abstract void putItems(WritePolicy policy, Key key, Map map);
+
 }

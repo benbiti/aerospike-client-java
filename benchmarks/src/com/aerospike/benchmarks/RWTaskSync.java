@@ -20,9 +20,15 @@ import com.aerospike.client.AerospikeClient;
 import com.aerospike.client.Bin;
 import com.aerospike.client.Key;
 import com.aerospike.client.Record;
+import com.aerospike.client.cdt.MapOperation;
+import com.aerospike.client.cdt.MapPolicy;
+import com.aerospike.client.cluster.Node;
 import com.aerospike.client.policy.WritePolicy;
 import com.aerospike.client.util.RandomShift;
 import com.aerospike.client.util.Util;
+
+import java.util.Map;
+
 /**
  * Synchronous read/write task.
  */
@@ -37,7 +43,11 @@ public class RWTaskSync extends RWTask implements Runnable {
 	
 	public void run() {
 		RandomShift random = RandomShift.instance();
-		
+		Node[] nodes = client.getNodes();
+		for (int i = 0; i < nodes.length; i++) {
+			Node node = nodes[i];
+			System.out.println("Node Info Begin: " + node.toString());
+		}
 		while (valid) {
 			runCommand(random);
 			
@@ -60,6 +70,11 @@ public class RWTaskSync extends RWTask implements Runnable {
 				}
 			}
 		}
+		nodes = client.getNodes();
+		for (int i = 0; i < nodes.length; i++) {
+			Node node = nodes[i];
+			System.out.println("Node Info End: " + node.toString());
+		}
 	}
 
 	@Override
@@ -74,6 +89,23 @@ public class RWTaskSync extends RWTask implements Runnable {
 		else {
 			client.put(writePolicy, key, bins);
 			counters.write.count.getAndIncrement();			
+		}
+	}
+
+	@Override
+	protected void putItems(WritePolicy writePolicy, Key key, Map map) {
+		if (counters.write.latency != null) {
+			long begin = System.nanoTime();
+			client.operate(writePolicy, key,
+					MapOperation.putItems(MapPolicy.Default, "0", map));
+			long elapsed = System.nanoTime() - begin;
+			counters.write.count.getAndIncrement();
+			counters.write.latency.add(elapsed);
+		}
+		else {
+			client.operate(writePolicy, key,
+					MapOperation.putItems(MapPolicy.Default, "0", map));
+			counters.write.count.getAndIncrement();
 		}
 	}
 	

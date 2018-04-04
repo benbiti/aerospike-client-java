@@ -136,9 +136,10 @@ public class Main implements Log.Callback {
 		options.addOption("o", "objectSpec", true, 
 			"I | S:<size> | B:<size>\n" +
 			"Set the type of object(s) to use in Aerospike transactions. Type can be 'I' " +
-			"for integer, 'S' for string, or 'B' for Java blob. If type is 'I' (integer), " + 
+			"for integer, 'S' for string, or 'B' for Java blob, or 'M' for Map . If type is 'I' (integer), " +
 			"do not set a size (integers are always 8 bytes). If object_type is 'S' " + 
-			"(string), this value represents the length of the string."
+			"(string), this value represents the length of the string. " +
+			"If object_type is 'M'(Map), 'A' for Map "
 			);
 		options.addOption("R", "random", false, 
 			"Use dynamically generated random bin values instead of default static fixed bin values."
@@ -152,6 +153,7 @@ public class Main implements Log.Callback {
 			"I | RU,<percent>[,<percent2>][,<percent3>] | RMU | RMI | RMD\n" +
 			"Set the desired workload.\n\n" +  
 			"   -w I sets a linear 'insert' workload.\n\n" +
+			"   -w RUM like RU, only for Map test" +
 			"   -w RU,80 sets a random read-update workload with 80% reads and 20% writes.\n\n" + 
 			"      100% of reads will read all bins.\n\n" + 
 			"      100% of writes will write all bins.\n\n" + 
@@ -462,11 +464,15 @@ public class Main implements Log.Callback {
 					throw new Exception("Invalid workload number of arguments: " + workloadOpts.length + " Expected 1.");
 				}
 			}
-			else if (workloadType.equals("RU") || workloadType.equals("RR")) {
+			else if (workloadType.equals("RU") || workloadType.equals("RR") || workloadType.equals("RUM")) {
 
 				args.workload = Workload.READ_UPDATE;
 				if (workloadType.equals("RR")) {
 					args.writePolicy.recordExistsAction = RecordExistsAction.REPLACE;
+				}
+
+				if (workloadType.equals("RUM")) {
+					args.workload = Workload.MAP_READ_UPDATE;
 				}
 
 				if (workloadOpts.length < 2 || workloadOpts.length > 4) {
@@ -800,6 +806,12 @@ public class Main implements Log.Callback {
 				
 			case 'B':
 				System.out.println("byte[" + spec.size + "]");
+				break;
+			case 'M':
+				System.out.println("CDT Map[" + spec.size + "]");
+				break;
+			case 'A':
+				System.out.println("CDT Map[" + spec.size + "]");
 				break;
 			}
 			binCount++;
